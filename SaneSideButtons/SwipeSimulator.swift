@@ -114,6 +114,15 @@ final class SwipeSimulator: Sendable {
         }
     }
 
+    func recreateEventTap() {
+        self.eventTapIsRunning.withLock { $0 = false }
+        try? self.setupEventTap()
+    }
+
+    func markEventTapAsInactive() {
+        self.eventTapIsRunning.withLock { $0 = false }
+    }
+
     private func fakeSwipe(direction: TLInfoSwipeDirection) {
         let eventBegin: CGEvent = tl_CGEventCreateFromGesture(self.swipeBegin as CFDictionary,
                                                               [] as CFArray).takeRetainedValue()

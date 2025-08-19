@@ -9,6 +9,7 @@ import AppKit
 import SwiftUI
 import ServiceManagement
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var frontmostAppBundleID: String?
@@ -26,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
+    private var sessionBecameActiveTask: Task<Void, Never>?
+    private var sessionResignedActiveTask: Task<Void, Never>?
 
     // MARK: - Menu Bar
 
@@ -89,6 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         self.setupTapWithPermissions()
         self.setupMenuBarExtra()
+        self.startSessionMonitoring()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -101,12 +105,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
     }
-}
 
 // MARK: - Functions
 
-private extension AppDelegate {
-    @MainActor private func setupMenuBarExtra() {
+    deinit {
+        self.sessionBecameActiveTask?.cancel()
+        self.sessionResignedActiveTask?.cancel()
+    }
+
+    private func setupMenuBarExtra() {
         if let button = self.menuBarExtra.button {
             button.image = NSImage(resource: .menuIcon)
         }
@@ -130,40 +137,47 @@ private extension AppDelegate {
         self.menuBarExtra.menu = menu
     }
 
-    @objc private func hideMenuBarExtra() {
+    @objc
+    private func hideMenuBarExtra() {
         self.menuBarExtra.isVisible = false
     }
 
-    @MainActor @objc private func about() {
+    @objc
+    private func about() {
         NSApplication.shared.activate(ignoringOtherApps: true)
         NSApplication.shared.orderFrontStandardAboutPanel()
     }
 
-    @MainActor @objc private func quit() {
+    @objc
+    private func quit() {
         NSApplication.shared.terminate(nil)
     }
 
-    @objc private func ignoreFrontmostApp() {
+    @objc
+    private func ignoreFrontmostApp() {
         guard let frontmostAppBundleID else { return }
         SwipeSimulator.shared.addIgnoredApplication(bundleID: frontmostAppBundleID)
     }
 
-    @objc private func unignoreFrontmostApp() {
+    @objc
+    private func unignoreFrontmostApp() {
         guard let frontmostAppBundleID else { return }
         SwipeSimulator.shared.removeIgnoredApplication(bundleID: frontmostAppBundleID)
     }
 
-    @objc private func toggleReverse() {
+    @objc
+    private func toggleReverse() {
         SwipeSimulator.shared.toggleReverseButtons()
     }
 
-    @objc private func toggleLaunchAtLogin() {
+    @objc
+    private func toggleLaunchAtLogin() {
         self.isLaunchAtLoginEnabled.toggle()
     }
 
     // MARK: - Setup & Permissions
 
-    @MainActor private func setupTapWithPermissions() {
+    private func setupTapWithPermissions() {
         self.getEventPermission()
         do {
             try SwipeSimulator.shared.setupEventTap()
@@ -174,7 +188,8 @@ private extension AppDelegate {
         }
     }
 
-    @discardableResult private func getEventPermission() -> Bool {
+    @discardableResult
+    private func getEventPermission() -> Bool {
         if !CGPreflightListenEventAccess() {
             CGRequestListenEventAccess()
             return false
@@ -182,7 +197,8 @@ private extension AppDelegate {
         return true
     }
 
-    @MainActor @objc private func promptPermissions() {
+    @objc
+    private func promptPermissions() {
         NSApplication.shared.activate(ignoringOtherApps: true)
         self.permissionWindow = NSWindow(
             contentRect: NSRect(),
@@ -202,6 +218,20 @@ private extension AppDelegate {
         self.permissionWindow?.center()
         self.permissionWindow?.makeKeyAndOrderFront(nil)
         self.permissionWindow?.delegate = self
+    }
+
+    private func startSessionMonitoring() {
+        self.sessionBecameActiveTask = Task {
+            for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.sessionDidBecomeActiveNotification) {
+                SwipeSimulator.shared.recreateEventTap()
+            }
+        }
+
+        self.sessionResignedActiveTask = Task {
+            for await _ in NSWorkspace.shared.notificationCenter.notifications(named: NSWorkspace.sessionDidResignActiveNotification) {
+                SwipeSimulator.shared.markEventTapAsInactive()
+            }
+        }
     }
 }
 
