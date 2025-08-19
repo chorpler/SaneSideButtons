@@ -13,7 +13,7 @@ Starting with version 1.0.7 SaneSideButtons is maintained by [Jan Hülsmann](htt
 
 ## Installation
 
-Download SaneSideButtons from [here](https://github.com/thealpa/SaneSideButtons/releases/download/1.1.0/SaneSideButtons.dmg) or install using Homebrew:
+Download SaneSideButtons from [here](https://github.com/thealpa/SaneSideButtons/releases/latest/download/SaneSideButtons.dmg) or install using Homebrew:
 
 ```bash
 brew install --cask sanesidebuttons
