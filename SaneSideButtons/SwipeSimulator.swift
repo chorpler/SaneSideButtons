@@ -43,9 +43,9 @@ final class SwipeSimulator: Sendable {
     /// Whether the CGEvent tap is currently active.
     private let eventTapIsRunning: Mutex<Bool> = Mutex(false)
 
-    /// A list of bundle identifiers that are ignored.
-    private let ignoredApplications: Mutex<[String]> = Mutex(
-        UserDefaults.standard.stringArray(forKey: Keys.ignored) ?? []
+    /// A set of bundle identifiers that are ignored.
+    private let ignoredApplications: Mutex<Set<String>> = Mutex(
+        Set(UserDefaults.standard.stringArray(forKey: Keys.ignored) ?? [])
     )
 
     /// Whether the swipe direction is reversed (e.g. right <-> left).
@@ -72,15 +72,15 @@ final class SwipeSimulator: Sendable {
 
     func addIgnoredApplication(bundleID: String) {
         self.ignoredApplications.withLock { applications in
-            applications.append(bundleID)
-            UserDefaults.standard.set(applications, forKey: Keys.ignored)
+            applications.insert(bundleID)
+            UserDefaults.standard.set(Array(applications), forKey: Keys.ignored)
         }
     }
 
     func removeIgnoredApplication(bundleID: String) {
         self.ignoredApplications.withLock { applications in
-            applications.removeAll { $0 == bundleID }
-            UserDefaults.standard.set(applications, forKey: Keys.ignored)
+            applications.remove(bundleID)
+            UserDefaults.standard.set(Array(applications), forKey: Keys.ignored)
         }
     }
 
